@@ -1,7 +1,7 @@
 
 #include "os.h"
 #define INTERVAL 9
-#define LEVELS 5 // there are 5 levels in the multy level page table counting from 0 - 4
+#define LEVELS 5 // there are 5 levels in the multy level page table counting 0 - 4
 #define VALID 1
 
 uint64_t getLoc(uint64_t vpn, int level) {  // level = 0 ... 4 
@@ -26,7 +26,7 @@ void page_table_update(uint64_t pt, uint64_t vpn, uint64_t ppn){
 			currPageAddress = (ppn == NO_MAPPING) ? currPageAddress - 1 : (ppn << 12) + 1;
 		}
 		
-		if (i < 4) {  // not the lowes level
+		if (i < 4) {  // not the lowest level
             currPageAddress = pt_pointer[index];
             if ((ppn == NO_MAPPING) & !isValid(currPageAddress))
 				return;
