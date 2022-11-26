@@ -1,0 +1,9 @@
+total 464
+drwxr-xr-x  8 guylamdan  staff     256 Nov 26 19:18 .
+drwxr-xr-x  6 guylamdan  staff     192 Nov 21 14:36 ..
+-rwxr-xr-x  1 guylamdan  staff   35122 Nov 26 19:15 a.out
+-rw-r--r--  1 guylamdan  staff    6383 Nov 26 19:15 myshell.c
+-rw-r--r--  1 guylamdan  staff    3736 Nov 26 16:51 notmyshell.c
+-rwx------  1 guylamdan  staff       0 Nov 26 19:18 output.txt
+-rw-rw-r--@ 1 guylamdan  staff    1363 Nov 26 16:48 shell.c
+-rw-rw-r--@ 1 guylamdan  staff  184218 Nov 21 14:36 shell.pdf
