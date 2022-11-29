@@ -55,12 +55,10 @@ static void child_handler(int sig) {
     while((pid = waitpid(-1, &status, WNOHANG)) > 0);
 }
 
-static int spec_waitpid(int pid){
+static void spec_waitpid(int pid){
     if (waitpid(pid, NULL, 0) < 0 && (errno == EINTR || errno != ECHILD)){ // ignore only EINTR and ECHILD errors
         fprintf(stderr,"Error with waitpid process: %s\n", strerror(errno));
-        return 0; // zero or 1??? 
     }
-    return 1;
 }
 
 static void prevent_zombies_handler() {
@@ -114,15 +112,16 @@ int piping(char* commandA, char** commandArgsA, char* commandB, char** commandAr
             if (execvp(commandB,commandArgsB) < 0){
                 fprintf(stderr,"Error: %s\n", strerror(errno));
                 exit(1);
-            }        
+            }
+        }        
         else {
             close(fd[0]);
             close(fd[1]);
             spec_waitpid(pid_a);
             spec_waitpid(pid_b);
         }
-
-    }}
+        
+    }
     return 1;
 }
 
@@ -244,6 +243,7 @@ int process_arglist(int count, char** arglist){
 int prepare(void){
     printf("%d\n", getpid());
     initialize_signals(PARENT);
+    prevent_zombies_handler();
     return 0;
 }
 
