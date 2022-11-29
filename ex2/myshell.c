@@ -3,8 +3,9 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include<fcntl.h>
+#include <fcntl.h>
 #include <signal.h>
+#include <sys/wait.h>
 
 
 enum Process {EXECOMMAND, EXEBACKGROUND, PIPING, REDIRECTING};
@@ -71,24 +72,10 @@ static void prevent_zombies_handler() {
 }
 
 
-
-
-void print_args(char** args){
-    int i = 0;
-
-    while(args[i] != NULL){
-        printf("%s\t", args[i++]);
-    }
-    printf("%s\n","");
-
-}
-
 int piping(char* commandA, char** commandArgsA, char* commandB, char** commandArgsB){
     int fd[2];
     int pid_a;
     int pid_b;
-
-    signal(SIGCHLD, SIG_DFL); // default behavior for child
 
     if (pipe(fd) < 0){
         fprintf(stderr,"Error: %s\n", strerror(errno));
@@ -127,9 +114,7 @@ int piping(char* commandA, char** commandArgsA, char* commandB, char** commandAr
             if (execvp(commandB,commandArgsB) < 0){
                 fprintf(stderr,"Error: %s\n", strerror(errno));
                 exit(1);
-            }
-            exit(0);
-        }
+            }        
         else {
             close(fd[0]);
             close(fd[1]);
@@ -137,35 +122,29 @@ int piping(char* commandA, char** commandArgsA, char* commandB, char** commandAr
             spec_waitpid(pid_b);
         }
 
-    }
+    }}
     return 1;
 }
 
 int redirecting(char* command, char** commandArgs, char* fileName){
 
     int pid;
-    int fd = open(fileName, O_WRONLY|O_CREAT, S_IRWXU); // check this number
+    int fd = open(fileName, O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU); // https://man7.org/linux/man-pages/man2/open.2.html, https://man7.org/linux/man-pages/man2/open.2.html
 
-    signal(SIGCHLD, SIG_DFL);
     pid = fork();
-
-
     if (pid  == 0){
         initialize_signals(CHILD);
-        dup2(fd, 1); // change to general Names 
+        dup2(fd, 1); 
         close(fd);
-        execvp(command, commandArgs); // don't forget to send an error 
-        exit(0);
-
-    }
-    else {
-        close(fd);
-        spec_waitpid(pid);
-        return 1;  
-    }
-
+        if (execvp(command,commandArgs) < 0){
+                fprintf(stderr,"Error: %s\n", strerror(errno));
+                exit(1);
+        }}       
+        else {
+            close(fd);
+            spec_waitpid(pid);
+        }
     return 1;
-  
 }
 
 int backGroundProcess(char* command, char** commandArgs){
@@ -177,17 +156,12 @@ int backGroundProcess(char* command, char** commandArgs){
         return 1; // terminate the shell (?)
     }
 
-
     else if (pid == 0) {
         initialize_signals(PARENT); // should not terminate UPON SIGINT like parent behavior
-        
         if (execvp(command,commandArgs) < 0){
             fprintf(stderr,"Error: %s\n", strerror(errno));
             exit(1);
-        }
-        exit(1);
-    }
-
+        }}
     prevent_zombies_handler();
     return 1;
 }
