@@ -70,7 +70,7 @@ static int prevent_zombies_handler() {
     sa.sa_flags = SA_RESTART; 
     sa.sa_handler = child_handler;
      if (sigaction(SIGCHLD, &sa, NULL) == -1){ // https://man7.org/linux/man-pages/man2/sigaction.2.html#RETURN_VALUE
-        fprintf(stderr,"Error with waitpid process: %s\n", strerror(errno));
+        fprintf(stderr,"Error with signal handeling: %s\n", strerror(errno));
         exit(1);
      }
 
@@ -103,7 +103,7 @@ int piping(char* commandA, char** commandArgsA, char* commandB, char** commandAr
         if (dup2(fd[1],1) == -1){
             fprintf(stderr,"Error with dup2: %s\n", strerror(errno)); // https://www.mkssoftware.com/docs/man3/dup2.3.asp
             exit(1);
-        }; // https://www.youtube.com/watch?v=5fnVr-zH-SE
+        };
 
         close(fd[0]);
         close(fd[1]);
@@ -123,7 +123,7 @@ int piping(char* commandA, char** commandArgsA, char* commandB, char** commandAr
             return 0;
         }
         
-        /* second xommand child case */ 
+        /* second command child case */ 
 
         else if (pid_b == 0){
             initialize_signals(CHILD); // don't ignore sigint
@@ -167,7 +167,7 @@ int redirecting(char* command, char** commandArgs, char* fileName){
         }
 
     else if (pid  == 0){
-        initialize_signals(CHILD);
+        initialize_signals(CHILD); // do not ignore SIGINT
 
         if (dup2(fd, 1) == -1){ // https://www.geeksforgeeks.org/dup-dup2-linux-system-call/
             fprintf(stderr,"Error with dup2: %s\n", strerror(errno)); // https://www.mkssoftware.com/docs/man3/dup2.3.asp
@@ -205,7 +205,7 @@ int backGroundProcess(char* command, char** commandArgs){
             exit(1);
         }}
 
-    return prevent_zombies_handler();
+    return prevent_zombies_handler(); // define the reqired behavior for SIGCHLD
 }
 
 int standartProcess(char* command, char** commandArgs){
@@ -271,14 +271,14 @@ int process_arglist(int count, char** arglist){
     }
 
     else { 
-         return standartProcess(commandA, arglist);
+         return standartProcess(commandA, arglist); 
     }
 
     return 1;
 }
 
 int prepare(void){
-    initialize_signals(PARENT);
+    initialize_signals(PARENT); // ignore SIGINT
     return 0;
 }
 
