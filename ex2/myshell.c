@@ -55,7 +55,7 @@ static void child_handler(int sig) {
 }
 
 static int spec_waitpid(int pid){
-    // https://linux.die.net/man/2/waitpid
+    // Ignore only EINTR and ECHILD
     if (waitpid(pid, NULL, 0) < 0 && (errno != EINTR && errno != ECHILD)) { // https://man7.org/linux/man-pages/man3/errno.3.html, https://linux.die.net/man/2/waitpid
         fprintf(stderr,"Error with waitpid process: %s\n", strerror(errno));
         return 0;
