@@ -5,7 +5,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
-// #include <sys/wait.h>
+#include <sys/wait.h> 
+// https://stackoverflow.com/questions/41884685/implicit-declaration-of-function-wait
 
 
 enum Process {EXECOMMAND, EXEBACKGROUND, PIPING, REDIRECTING}; // https://www.geeksforgeeks.org/enumeration-enum-c/
