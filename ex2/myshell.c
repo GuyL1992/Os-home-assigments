@@ -55,7 +55,8 @@ static void child_handler(int sig) {
 }
 
 static int spec_waitpid(int pid){
-    if (waitpid(pid, NULL, 0) < 0 && (errno != EINTR && errno != ECHILD)) { // ignore only EINTR and ECHILD errors, https://man7.org/linux/man-pages/man3/errno.3.html
+    // https://linux.die.net/man/2/waitpid
+    if (waitpid(pid, NULL, 0) < 0 && (errno != EINTR && errno != ECHILD)) { // https://man7.org/linux/man-pages/man3/errno.3.html, https://linux.die.net/man/2/waitpid
         fprintf(stderr,"Error with waitpid process: %s\n", strerror(errno));
         return 0;
     }
@@ -63,10 +64,10 @@ static int spec_waitpid(int pid){
     return 1;
 }
 
-static int prevent_zombies_handler() { /// checkkkkkkkkkkkk
+static int prevent_zombies_handler() { 
     //ERAN'S TRICK
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART; //| SA_NOCLDSTOP;
+    sa.sa_flags = SA_RESTART; 
     sa.sa_handler = child_handler;
      if (sigaction(SIGCHLD, &sa, NULL) == -1){ // https://man7.org/linux/man-pages/man2/sigaction.2.html#RETURN_VALUE
         fprintf(stderr,"Error with waitpid process: %s\n", strerror(errno));
@@ -250,7 +251,6 @@ int process_arglist(int count, char** arglist){
     commandA = arglist[0];
 
     if (action == PIPING){
-        // commandA = arglist[0];
         commandB = arglist[separateLocation + 1];
         commandArgsA = arglist;
         commandArgsB= &(arglist[separateLocation + 1]);
@@ -259,7 +259,6 @@ int process_arglist(int count, char** arglist){
     }
 
     else if (action == REDIRECTING){
-        // commandA = arglist[0];
         arglist[separateLocation] = NULL;
         commandArgsA = arglist;
         fileName = arglist[separateLocation + 1];
@@ -267,7 +266,6 @@ int process_arglist(int count, char** arglist){
     }
 
     else if (action == EXEBACKGROUND){
-        // commandA = arglist[0];
         arglist[count - 1] = NULL;
         return backGroundProcess(commandA, arglist);
     }
@@ -281,7 +279,6 @@ int process_arglist(int count, char** arglist){
 
 int prepare(void){
     initialize_signals(PARENT);
-    // prevent_zombies_handler();
     return 0;
 }
 
