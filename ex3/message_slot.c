@@ -15,17 +15,14 @@
 
 MODULE_LICENSE("GPL");
 
-#define SUCCESS 0
-#define DEVICE_RANGE_NAME "message_slot"
-#define MAX_BUF_LEN 128
-#define DEVICE_FILE_NAME "message_slot_device"
+
 
 //================== DEFINE STRUCTS  ============================
 
 
 struct info {
   int size;
-  char message[MAX_BUF_LEN];
+  char message[MAX_MESSAGE_LEN];
 };
 
 
@@ -56,6 +53,8 @@ static struct slot_node* message_slot_list[257];
 struct slot_node* new_slot(int minor) {
     struct slot_node *temp;
     temp = (struct slot_node*)kmalloc(sizeof(struct slot_node),GFP_KERNEL);
+    if (temp == NULL)
+      return NULL;
     temp->minor = minor;
     temp->channels_tree = NULL;
     temp-> set_channel = NULL;
@@ -131,7 +130,7 @@ static void free_channels (struct channel_node* device_channels_tree){
 static int device_open( struct inode* inode, struct file*  file)
 {
   unsigned int minor;
-  struct data* file_data = kmalloc(sizeof(struct data), GFP_KERNEL);
+  struct data* file_data = kmalloc(sizeof(struct data), GFP_KERNEL);  
   if (file_data == NULL)
     return -EINVAL;
   
@@ -139,6 +138,8 @@ static int device_open( struct inode* inode, struct file*  file)
 
   if (message_slot_list[minor] == NULL){
       message_slot_list[minor] = new_slot(minor);
+      if (message_slot_list[minor] == NULL)
+        return -EINVAL;
   }
   
   file_data->device_slot = message_slot_list[minor];
@@ -158,8 +159,6 @@ static int device_release( struct inode* inode,
 }
 
 //---------------------------------------------------------------
-// a process which has already opened
-// the device file attempts to read from it
 static ssize_t device_read( struct file* file,
                             char __user* buffer,
                             size_t       length,
@@ -167,9 +166,8 @@ static ssize_t device_read( struct file* file,
 {
   int i;
   struct data* device_data = (struct data*)(file->private_data);
-  // struct slot_node* device_node;
 
-  if (device_data->set_channel == NULL)
+  if (device_data->set_channel == NULL || buffer == NULL)
     return -EINVAL;  
   
   if ((device_data->set_channel)-> info == NULL){
@@ -179,19 +177,15 @@ static ssize_t device_read( struct file* file,
   if ((device_data->set_channel)->info->size > length){
     return -ENOSPC;
   }
-  // device_node = device_data->device_slot;
   
   for (i = 0; i < (device_data->set_channel)->info->size; i++){
     put_user((device_data->set_channel)->info->message[i],&buffer[i]); // check id this is the direction
   }
-  // device_node->set_channel = NULL;
 
   return i;
 }
 
 //---------------------------------------------------------------
-// a processs which has already opened
-// the device file attempts to write to it
 static ssize_t device_write( struct file*       file,
                              const char __user* buffer,
                              size_t             len,
@@ -199,13 +193,12 @@ static ssize_t device_write( struct file*       file,
 {
     int i;
     struct data* device_data = (struct data*)(file->private_data);
-    // struct slot_node* device_node = (struct slot_node*) (file->private_data);
 
     if (device_data-> set_channel == NULL){
         return -EINVAL;
     }
     
-    if (len == 0 || len > 128){
+    if (len == 0 || len > MAX_MESSAGE_LEN || buffer == NULL){
       return -EMSGSIZE;
     }
     
@@ -220,7 +213,6 @@ static ssize_t device_write( struct file*       file,
     }
 
    (device_data->set_channel)->info->size = i;
-  //  device_node->set_channel = NULL;
 
     return i;
 
@@ -228,7 +220,6 @@ static ssize_t device_write( struct file*       file,
 
 static long device_ioctl (struct file* file, unsigned int cmd, unsigned long param) {
 
-    // struct slot_node* device_node;
     struct data* device_data = (struct data*)(file->private_data);
 
     if (cmd != MSG_SLOT_CHANNEL || param == 0) {
@@ -236,7 +227,6 @@ static long device_ioctl (struct file* file, unsigned int cmd, unsigned long par
     }
 
     
-    // device_node = (struct slot_node*) (file->private_data);
     device_data->set_channel = search_channel(device_data->device_slot->channels_tree, param);
 
     if (device_data->set_channel == NULL) {
@@ -252,10 +242,9 @@ static long device_ioctl (struct file* file, unsigned int cmd, unsigned long par
 
 //==================== DEVICE SETUP =============================
 
-// This structure will hold the functions to be called
-// when a process does something to the device we created
+
 struct file_operations Fops = {
-  .owner	  = THIS_MODULE, // Required for correct count of module usage. This prevents the module from being removed while used.
+  .owner	  = THIS_MODULE,
   .read           = device_read,
   .write          = device_write,
   .open           = device_open,
@@ -264,7 +253,6 @@ struct file_operations Fops = {
 };
 
 //---------------------------------------------------------------
-// Initialize the module - Register the character device
 static int simple_init(void)
 {   
   int response;
@@ -284,8 +272,6 @@ static int simple_init(void)
 //---------------------------------------------------------------
 static void simple_cleanup(void)
 {
-  // Unregister the device
-  // Should always succeed
   int i;
   for (i = 0; i < 257; i++){
     if (message_slot_list[i] != NULL){  

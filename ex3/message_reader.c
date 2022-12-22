@@ -24,13 +24,13 @@ static void error_exit(enum ERROR_TYPE e, int fd) {
             break;
         
         case(IOCTL):
-            fprintf(stderr, "Invalid argument");
+            fprintf(stderr, "Problem with IOCTL,check for Invalid argument");
             close(fd);
             exit(1);
             break;
         
         case(READ):
-            fprintf(stderr, "Invalid argument");
+            fprintf(stderr, "Problem with READ, check for Invalid argument");
             close(fd);
             exit(1);
             break;
@@ -44,9 +44,9 @@ static void error_exit(enum ERROR_TYPE e, int fd) {
         
         default:
             fprintf(stderr, "A problem has occured");
-        
-        exit(1);
 
+        exit(1);
+        
     } 
 
 }
@@ -54,12 +54,11 @@ static void error_exit(enum ERROR_TYPE e, int fd) {
 
 int main (int argc, char* argv[]) {
 
-
     char* path;
     int channel_id;
     int fd;
     int res;
-    char message[128];
+    char message[MAX_MESSAGE_LEN];
 
     if (argc != 3)
         error_exit(ARGC,fd);
@@ -73,7 +72,7 @@ int main (int argc, char* argv[]) {
     if ((res = ioctl(fd, MSG_SLOT_CHANNEL, channel_id)) < 0)
         error_exit(IOCTL,fd);
 
-    if ((res = read(fd, message, 128)) < 0)
+    if ((res = read(fd, message, MAX_MESSAGE_LEN)) < 0)
         error_exit(READ,fd);
     
     else {

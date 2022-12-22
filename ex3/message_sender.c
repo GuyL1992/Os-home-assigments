@@ -66,22 +66,12 @@ int main (int argc, char* argv[]) {
 
     if ((fd = open(path, O_WRONLY)) < 0)
         error_exit(FILE_E,fd);
-    
-    printf("1\n");
-
 
     if ((res = ioctl(fd, MSG_SLOT_CHANNEL, channel_id)) < 0)
         error_exit(IOCTL,fd);
-    
-    printf("%d\n", res);
-    
-    printf("2\n");
 
     if ((res = write(fd, message, strlen(message))) < 0)
         error_exit(WRITE,fd);
-    
-    printf("3\n");
-
     
     close(fd);
 
