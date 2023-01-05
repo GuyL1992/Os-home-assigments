@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <errno.h>
 #include <dirent.h>
 #include <sys/types.h>
@@ -52,12 +52,13 @@ cnd_t* conditions;
 atomic_int thread_initiated = 0;
 atomic_int requested_threads_num;
 atomic_int sleeping_threads = 0;
-int finished_the_search = 0;
 char* search_term;
 atomic_int matches_count;
 queue* mission_queue;
 struct queue_node* queue_node;
 atomic_int error_thread = 0;
+mission* root_mission;
+char* root_diretory;
 
 // ################### DEFINNE QUEUE FUNCTION ###################
 
@@ -65,7 +66,7 @@ void enqueue_node(long id){
     struct node* my_node = malloc(sizeof(struct node));
 
     if (my_node == NULL){
-        fprintf(stderr,"memory allocation failed\n"); // (?)
+        fprintf(stderr,"memory allocation failed\n");
         error_thread = 1;
     }
 
@@ -141,14 +142,14 @@ void simple_search(mission* mission, char* search_term) {
 
     DIR *dir;
     struct dirent* entry;
-    struct stat dirent_metadata;
+    struct stat dirent;
     char* full_path;
     struct mission* new_mission;
     
     
     //https://www.ibm.com/docs/en/zos/2.4.0?topic=functions-readdir-read-entry-from-directory
     if ((dir = opendir(mission->directory)) == NULL){
-        printf("Directory %s: Permission denied.\n",mission->directory);
+        printf("Can NOT open directory %s\n", mission->directory);
         return;
     }
     
@@ -163,20 +164,20 @@ void simple_search(mission* mission, char* search_term) {
             error_thread = 1;
             continue;
         }
+
         sprintf(full_path,"%s/%s",mission->directory,entry->d_name);
 
-        //https://man7.org/linux/man-pages/man2/lstat.2.html
-        if(stat(full_path,&dirent_metadata) < 0){
-            error_thread = 1; // (?)
+        if(stat(full_path,&dirent) < 0){
+            error_thread = 1;
             continue;
         }
 
-        if(S_ISDIR(dirent_metadata.st_mode)){
+        if(S_ISDIR(dirent.st_mode)){
             
             // https://www.geeksforgeeks.org/access-command-in-linux-with-examples/
             // https://linux.die.net/man/2/access 
 
-            if (access(full_path, R_OK | X_OK) < 0 || access(full_path, X_OK) < 0){
+            if (access(full_path, R_OK) < 0 || access(full_path, X_OK) < 0){
                 printf("Directory %s: Permission denied.\n",full_path);
                 continue;
             }
@@ -190,9 +191,7 @@ void simple_search(mission* mission, char* search_term) {
 
                 new_mission->directory = full_path;
                 enqueue(mission_queue, new_mission);
-                
                 dequeue_node(0);
-
                 mtx_unlock(&queue_lock);
                 continue;
             }
@@ -223,9 +222,11 @@ int thread_search(void* t){
     mtx_lock(&sync_lock);
     thread_initiated++;
     
+    /* signal the main thread that all threads are ready*/
     if (thread_initiated == requested_threads_num)
         cnd_signal(&GO);
 
+    /* wait for signal from the main thread*/
     cnd_wait(&laavoda, &sync_lock);
     mtx_unlock(&sync_lock);
 
@@ -233,18 +234,23 @@ int thread_search(void* t){
 
         mtx_lock(&queue_lock);
 
-        while(mission_queue->head == NULL) {
+        while(mission_queue->head == NULL) { 
 
+            /* if the there are no mission check if you are the only one who is awake*/
             if(sleeping_threads + 1 == thread_initiated){
-                finished_the_search = 1;
-                dequeue_node(1);
+                dequeue_node(1); // each thread will wake the next sleeping one
                 mtx_unlock(&queue_lock);
                 thrd_exit(0);
-            }
 
+            }
+            /*
+            there might be another work in the future - go to sleep on it's condition
+            */
             enqueue_node(id);
-            cnd_wait(&conditions[id], &queue_lock);   
+            cnd_wait(&conditions[id], &queue_lock);
         }
+
+        /*if the queue is not empty - take out new "mission" and start searching for it's diretory*/
 
         my_mission = dequeue(mission_queue);
         mtx_unlock(&queue_lock);
@@ -261,13 +267,13 @@ int validate_input(int argc, char** argv){
         return 0;
     }
 
-    if (access(argv[1], R_OK | X_OK) < 0){ // more conditions
-        fprintf(stderr,"Root directory is unsearchable\n");
+     if (!isDir(argv[1])){
+        fprintf(stderr,"Invalid root directory\n");
         return 0;
     }
 
-    if (!isDir(argv[1])){
-        fprintf(stderr,"Invalid root directory\n");
+    if (access(argv[1], R_OK | X_OK) < 0){ 
+        fprintf(stderr,"Root directory is unsearchable\n");
         return 0;
     }
     
@@ -309,6 +315,9 @@ void prepare(){
 
     mission_queue->tail = NULL;
     mission_queue->head =NULL;
+
+    root_mission = malloc(sizeof(struct mission));
+    root_mission->directory = strdup(root_diretory);
 }
 
 void threads_get_ready_and_go(thrd_t* threads){
@@ -321,15 +330,12 @@ void threads_get_ready_and_go(thrd_t* threads){
         }
     }
 
-    cnd_wait(&GO,&sync_lock);
-    cnd_broadcast(&laavoda);
+    cnd_wait(&GO,&sync_lock); // main thread is waiting for the rest to be created
+    cnd_broadcast(&laavoda); // signal all other thread to start working
     mtx_unlock(&sync_lock);
 }
 
 int main (int argc, char** argv){
-
-    mission* root_mission;
-    char* root_diretory;
 
     if (!validate_input(argc, argv))
         exit(1);
@@ -340,8 +346,7 @@ int main (int argc, char** argv){
     thrd_t threads[requested_threads_num];
 
     prepare();
-    root_mission = malloc(sizeof(struct mission));
-    root_mission->directory = strdup(root_diretory);
+    
     enqueue(mission_queue, root_mission);
     
     
@@ -353,5 +358,5 @@ int main (int argc, char** argv){
     
     destory_resources();
     printf("Done searching, found %d files\n",matches_count);
-    thrd_exit(error_thread); // (?)
+    exit(error_thread);
 }
